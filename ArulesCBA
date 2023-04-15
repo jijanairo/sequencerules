@@ -1,0 +1,53 @@
+set.seed(1018)
+
+library(caret)
+library(arulesCBA)
+library(arulesViz)
+
+set.seed(1018)
+dataset <-read.csv("Q14.csv", header = TRUE) 
+
+validation_index <- createDataPartition(dataset$Class, p=0.7, list=FALSE)
+validation <- dataset[-validation_index,]
+dataset <- dataset[validation_index,]
+dataset$Class <- as.factor(dataset$Class)
+validation$Class <- as.factor(validation$Class)
+
+fit.rules <-CBA(Class ~ ., dataset, supp = 0.035, conf=0.9, maxlen = 5, pruning = "M2", disc.method = "mdlp", verbose = T)
+
+tr <- predict(fit.rules, dataset)
+tr_conf_matrix <- confusionMatrix(tr, dataset$Class, mode = "everything")
+tr_conf_matrix
+
+#Calculate MCC Training
+tr_TP <- tr_conf_matrix$table[1,1]
+tr_TN <- tr_conf_matrix$table[2,2]
+tr_FP <- tr_conf_matrix$table[1,2]
+tr_FN <- tr_conf_matrix$table[2,1]
+
+tr_mcc_num <- (tr_TP*tr_TN - tr_FP*tr_FN)
+tr_mcc_den <- as.double((tr_TP+tr_FP))*as.double((tr_TP+tr_FN))*as.double((tr_TN+tr_FP))*as.double((tr_TN+tr_FN))
+
+tr_mcc_final <- tr_mcc_num/sqrt(tr_mcc_den)
+tr_mcc_final
+#################  
+
+predictions <- predict(fit.rules, validation)
+
+conf_matrix <- confusionMatrix(predictions, validation$Class, mode = "everything")
+conf_matrix
+
+inspectDT(fit.rules$rules)
+rules <- inspect(fit.rules$rules)
+validation_view <- validation %>% mutate(pred = predictions)
+#Calculate MCC Test
+  TP <- conf_matrix$table[1,1]
+  TN <- conf_matrix$table[2,2]
+  FP <- conf_matrix$table[1,2]
+  FN <- conf_matrix$table[2,1]
+  
+  mcc_num <- (TP*TN - FP*FN)
+  mcc_den <- as.double((TP+FP))*as.double((TP+FN))*as.double((TN+FP))*as.double((TN+FN))
+  
+  mcc_final <- mcc_num/sqrt(mcc_den)
+  mcc_final
